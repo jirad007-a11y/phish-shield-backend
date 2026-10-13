@@ -1,90 +1,125 @@
-// server.js - Phish-Shield Express Backend
+// server.js - Phish-Shield Express Backend with Full Heuristics
 const express = require('express');
 const cors = require('cors');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Middleware
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 
-// Health check endpoint for Render
 app.get('/', (req, res) => {
-  res.status(200).send('Phish-Shield Backend is live and running 🚀');
+  res.status(200).send('Phish-Shield Backend is live 🚀');
 });
 
-// Main analysis endpoint
+// Brand Impersonation & Display Name Heuristics
+const KNOWN_BRANDS = ['paramount', 'paramountplus', 'netflix', 'paypal', 'apple', 'amazon', 'microsoft', 'google'];
+
+function analyzeSender(senderName, senderEmail) {
+  const flags = [];
+  let score = 0;
+
+  if (!senderEmail) return { score, flags };
+
+  const nameLower = (senderName || '').toLowerCase();
+  const emailLower = senderEmail.toLowerCase();
+  const domain = emailLower.split('@')[1] || '';
+
+  // 1. Display Name / Brand Impersonation Check
+  KNOWN_BRANDS.forEach(brand => {
+    if (nameLower.includes(brand) || emailLower.includes(brand)) {
+      if (!domain.endsWith(`${brand}.com`) && !domain.endsWith(`${brand}plus.com`)) {
+        flags.push('SENDER_IMPERSONATION');
+        score += 50; // Severe penalty for mimicking Paramount+ on random domains
+      }
+    }
+  });
+
+  // 2. Suspicious TLD / Random String Domain Detection
+  if (domain.endsWith('.work') || domain.endsWith('.xyz') || domain.endsWith('.top') || domain.endsWith('.click')) {
+    flags.push('SUSPICIOUS_TLD');
+    score += 25;
+  }
+
+  // 3. Gibberish / High-Entropy Email Usernames (e.g., flxfcqcxipwsyxiy)
+  const username = emailLower.split('@')[0] || '';
+  if (username.length > 12 && !/[aeiou]/.test(username.slice(0, 8))) {
+    flags.push('SUSPICIOUS_SENDER_ADDRESS');
+    score += 20;
+  }
+
+  return { score, flags };
+}
+
+function analyzeText(text) {
+  const flags = [];
+  let score = 0;
+  if (!text) return { score, flags };
+
+  const lower = text.toLowerCase();
+
+  // Social Engineering & Urgency
+  if (lower.includes('action needed') || lower.includes('reactivate now') || lower.includes('payment failed') || lower.includes('subscription is currently inactive')) {
+    flags.push('SOCIAL_ENGINEERING_PHRASE');
+    score += 30;
+  }
+
+  if (lower.includes('update your payment') || lower.includes('restore full access')) {
+    flags.push('PHISHING_KEYWORDS_FOUND');
+    score += 25;
+  }
+
+  return { score, flags };
+}
+
 app.post('/api/analyze', async (req, res) => {
   try {
     const { urls = [], text = '', senderName = '', senderEmail = '' } = req.body || {};
 
-    console.log('=== [Phish-Shield Backend Debug] ===');
-    console.log('Sender Email Received:', senderEmail || '(Empty)');
-    console.log('Sender Name Received:', senderName || '(Empty)');
-    console.log('URLs Count Received:', urls.length);
-    console.log('URLs List:', urls);
-    console.log('Text Length Received:', text.length);
+    console.log('=== [Phish-Shield Backend] Analyzing Request ===');
+    console.log('Sender:', senderName, `<${senderEmail}>`);
+    console.log('URLs Count:', urls.length);
 
-    // TODO: Replace or connect this with your actual heuristics / analysis engine
-    // For now, returning a sample structured response to test the round-trip connection.
-    // If you already have analysis functions, call them here:
-    // const analysisResult = runPhishingAnalysis({ urls, text, senderName, senderEmail });
+    // Run Heuristics
+    const senderAnalysis = analyzeSender(senderName, senderEmail);
+    const textAnalysis = analyzeText(text);
 
-    // Mock evaluation for demonstration if heuristics aren't wired up yet:
-    let riskScore = 0;
-    let overallVerdict = 'SAFE';
-    const senderFlags = [];
-    const textFlags = [];
+    const senderFlags = senderAnalysis.flags;
+    const textFlags = textAnalysis.flags;
+    
+    let totalScore = senderAnalysis.score + textAnalysis.score;
 
-    // Simple heuristic example check (customize based on your existing code)
-    if (senderEmail && (senderEmail.includes('support') || senderEmail.includes('verify')) && !senderEmail.endsWith('trusted-domain.com')) {
-      senderFlags.push('SENDER_DOMAIN_MISMATCH');
-      riskScore += 40;
-    }
-
-    if (text.toLowerCase().includes('password') || text.toLowerCase().includes('verify account') || text.toLowerCase().includes('urgent')) {
-      textFlags.push('PHISHING_KEYWORDS_FOUND');
-      riskScore += 35;
-    }
-
+    // Additional URL scoring
     if (urls.length > 0) {
-      riskScore += (urls.length * 5);
+      totalScore += 10;
     }
 
-    if (riskScore >= 70) {
+    const finalScore = Math.min(totalScore, 100);
+    let overallVerdict = 'SAFE';
+
+    if (finalScore >= 60) {
       overallVerdict = 'HIGH_RISK';
-    } else if (riskScore >= 30) {
+    } else if (finalScore >= 30) {
       overallVerdict = 'SUSPICIOUS';
     }
 
-    const emailSummary = {
-      overallVerdict,
-      riskScore: Math.min(riskScore, 100),
-      senderFlags,
-      textFlags
-    };
-
-    const results = urls.map(url => ({
-      url,
-      flags: [],
-      score: 0
-    }));
-
-    console.log('Sending response -> Verdict:', overallVerdict, '| Score:', emailSummary.riskScore);
+    console.log(`[Result] Verdict: ${overallVerdict} | Score: ${finalScore}/100`);
 
     res.json({
       success: true,
-      emailSummary,
-      results
+      emailSummary: {
+        overallVerdict,
+        riskScore: finalScore,
+        senderFlags,
+        textFlags
+      },
+      results: urls.map(url => ({ url, flags: [], score: 0 }))
     });
 
   } catch (err) {
     console.error('Error in /api/analyze:', err);
-    res.status(500).json({ success: false, error: 'Internal server error during analysis' });
+    res.status(500).json({ success: false, error: 'Internal server error' });
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Phish-Shield server listening on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
