@@ -1,12 +1,42 @@
-// server.js - Phish-Shield Express Backend with Full Heuristics
+// server.js - Phish-Shield Express Backend with Full Heuristics & Rate Limiting
 const express = require('express');
 const cors = require('cors');
+const { rateLimit } = require('express-rate-limit');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Trust proxy (required for correct client IP detection behind Render, Heroku, or load balancers)
+app.set('trust proxy', 1);
+
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
+
+// 1. Global Baseline Rate Limiter (Prevents general traffic flooding)
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15-minute window
+  limit: 100, // Limit each IP to 100 requests per window
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: 'Too many requests from this IP, please try again later.'
+  }
+});
+
+app.use(globalLimiter);
+
+// 2. Strict Rate Limiter for Analysis Endpoint (Protects expensive heuristics/scans)
+const analyzeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15-minute window
+  limit: 30, // Limit each IP to 30 analysis requests per window
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: 'Scan limit reached. Please wait a few minutes before analyzing more emails.'
+  }
+});
 
 app.get('/', (req, res) => {
   res.status(200).send('Phish-Shield Backend is live 🚀');
@@ -30,7 +60,7 @@ function analyzeSender(senderName, senderEmail) {
     if (nameLower.includes(brand) || emailLower.includes(brand)) {
       if (!domain.endsWith(`${brand}.com`) && !domain.endsWith(`${brand}plus.com`)) {
         flags.push('SENDER_IMPERSONATION');
-        score += 50; // Severe penalty for mimicking Paramount+ on random domains
+        score += 50; // Severe penalty for mimicking brands on random domains
       }
     }
   });
@@ -41,7 +71,7 @@ function analyzeSender(senderName, senderEmail) {
     score += 25;
   }
 
-  // 3. Gibberish / High-Entropy Email Usernames (e.g., flxfcqcxipwsyxiy)
+  // 3. Gibberish / High-Entropy Email Usernames
   const username = emailLower.split('@')[0] || '';
   if (username.length > 12 && !/[aeiou]/.test(username.slice(0, 8))) {
     flags.push('SUSPICIOUS_SENDER_ADDRESS');
@@ -72,7 +102,8 @@ function analyzeText(text) {
   return { score, flags };
 }
 
-app.post('/api/analyze', async (req, res) => {
+// Apply the strict analyzeLimiter middleware directly to the POST route
+app.post('/api/analyze', analyzeLimiter, async (req, res) => {
   try {
     const { urls = [], text = '', senderName = '', senderEmail = '' } = req.body || {};
 
