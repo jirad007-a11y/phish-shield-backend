@@ -54,7 +54,7 @@ function analyzeSender(senderName = '', senderEmail = '', subject = '') {
 
   if (!senderEmail) return { score, flags };
 
-  const rawName = (senderName || '').toLowerCase();
+  const rawName = (senderName || '').toLowerCase().trim();
   const emailLower = senderEmail.toLowerCase();
   const parts = emailLower.split('@');
   const username = parts[0] || '';
@@ -62,7 +62,6 @@ function analyzeSender(senderName = '', senderEmail = '', subject = '') {
   const domainBody = domain.split('.')[0] || '';
 
   // 1. Normalize Display Name: Remove spaces, periods, underscores, and dashes
-  // Catches obfuscated trickery like "FID.ELI.TY__L.I.FE" -> "fidelitylife"
   const normalizedName = rawName.replace(/[^a-z0-9]/g, '');
 
   // 2. Display Name / Brand Impersonation Check
@@ -74,25 +73,33 @@ function analyzeSender(senderName = '', senderEmail = '', subject = '') {
         !domain.endsWith(`${brand}life.com`)
       ) {
         flags.push('SENDER_IMPERSONATION');
-        score += 50; // Severe penalty for mimicking brands on random domains
+        score += 50;
       }
     }
   });
 
-  // 3. High-Entropy / Random Gibberish Domain Detection (e.g. rvcmefnnoukmfjeyptqxyiof)
+  // 3. Display Name vs Email Username Disconnect (e.g. Name: "Susan" vs "yanakolobneva81@gmail.com")
+  if (rawName && username && rawName.length >= 3 && !username.includes(rawName)) {
+    if (/^[a-z]+$/i.test(rawName) && rawName.length <= 8) {
+      flags.push('SENDER_NAME_MISMATCH');
+      score += 20;
+    }
+  }
+
+  // 4. High-Entropy / Random Gibberish Domain Detection
   const domainVowelCount = (domainBody.match(/[aeiou]/g) || []).length;
   if (domainBody.length > 15 && (domainVowelCount / domainBody.length) < 0.25) {
     flags.push('HIGH_ENTROPY_DOMAIN');
     score += 40;
   }
 
-  // 4. Obfuscation & Character Manipulation Check in Display Name
+  // 5. Obfuscation & Character Manipulation Check
   if (/[a-z]\.[a-z]\.[a-z]/i.test(rawName) || /_[a-z]_[a-z]/i.test(rawName)) {
     flags.push('NAME_OBFUSCATION_ATTEMPT');
     score += 25;
   }
 
-  // 5. IP Address Detection in Subject or Sender Address
+  // 6. IP Address Detection
   if (
     /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/.test(subject) || 
     /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/.test(senderEmail)
@@ -101,13 +108,13 @@ function analyzeSender(senderName = '', senderEmail = '', subject = '') {
     score += 20;
   }
 
-  // 6. Excessive Repeating Subdomains or Suspicious Structural Patterns
+  // 7. Excessive Subdomains or Suspicious Structure
   if ((domain.match(/\./g) || []).length > 3 || /ltd|survey|click|track|support/i.test(username)) {
     flags.push('SUSPICIOUS_SENDER_STRUCTURE');
     score += 20;
   }
 
-  // 7. Suspicious TLD / Random Domain Extension Detection
+  // 8. Suspicious TLD Detection
   if (
     domain.endsWith('.work') || 
     domain.endsWith('.xyz') || 
@@ -119,7 +126,7 @@ function analyzeSender(senderName = '', senderEmail = '', subject = '') {
     score += 25;
   }
 
-  // 8. Gibberish / High-Entropy Email Usernames
+  // 9. Gibberish Email Usernames
   if (username.length > 12 && !/[aeiou]/.test(username.slice(0, 8))) {
     flags.push('SUSPICIOUS_SENDER_ADDRESS');
     score += 20;
@@ -161,6 +168,29 @@ function analyzeText(text = '', subject = '') {
   ) {
     flags.push('SPAM_CLICKBAIT_PATTERNS');
     score += 35;
+  }
+
+  // 3. Fake Thread Prefix & Conversational Baiting
+  const subjectLower = (subject || '').toLowerCase().trim();
+
+  if (subjectLower.startsWith('re:') || subjectLower.startsWith('fwd:')) {
+    if (
+      subjectLower.includes('hiya') || 
+      subjectLower.includes('hey') || 
+      subjectLower.includes('hello') ||
+      combinedText.includes('use my email') ||
+      combinedText.includes('write me back') ||
+      combinedText.includes('reply to my')
+    ) {
+      flags.push('SUSPICIOUS_THREAD_BAIT');
+      score += 35;
+    }
+  }
+
+  // 4. Standalone Spam Bait / Cold Outreach Phrases
+  if (combinedText.includes('ya may use my email') || combinedText.includes('use my email')) {
+    flags.push('CONVERSATIONAL_SPAM_PATTERNS');
+    score += 25;
   }
 
   return { score, flags };
