@@ -56,7 +56,10 @@ function analyzeSender(senderName = '', senderEmail = '', subject = '') {
 
   const rawName = (senderName || '').toLowerCase();
   const emailLower = senderEmail.toLowerCase();
-  const domain = emailLower.split('@')[1] || '';
+  const parts = emailLower.split('@');
+  const username = parts[0] || '';
+  const domain = parts[1] || '';
+  const domainBody = domain.split('.')[0] || '';
 
   // 1. Normalize Display Name: Remove spaces, periods, underscores, and dashes
   // Catches obfuscated trickery like "FID.ELI.TY__L.I.FE" -> "fidelitylife"
@@ -76,13 +79,20 @@ function analyzeSender(senderName = '', senderEmail = '', subject = '') {
     }
   });
 
-  // 3. Obfuscation & Character Manipulation Check in Display Name
+  // 3. High-Entropy / Random Gibberish Domain Detection (e.g. rvcmefnnoukmfjeyptqxyiof)
+  const domainVowelCount = (domainBody.match(/[aeiou]/g) || []).length;
+  if (domainBody.length > 15 && (domainVowelCount / domainBody.length) < 0.25) {
+    flags.push('HIGH_ENTROPY_DOMAIN');
+    score += 40;
+  }
+
+  // 4. Obfuscation & Character Manipulation Check in Display Name
   if (/[a-z]\.[a-z]\.[a-z]/i.test(rawName) || /_[a-z]_[a-z]/i.test(rawName)) {
     flags.push('NAME_OBFUSCATION_ATTEMPT');
     score += 25;
   }
 
-  // 4. IP Address Detection in Subject or Sender Address
+  // 5. IP Address Detection in Subject or Sender Address
   if (
     /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/.test(subject) || 
     /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/.test(senderEmail)
@@ -91,13 +101,13 @@ function analyzeSender(senderName = '', senderEmail = '', subject = '') {
     score += 20;
   }
 
-  // 5. Excessive Repeating Subdomains or Suspicious Structural Patterns
-  if ((domain.match(/\./g) || []).length > 3 || /ltd|survey|click|track/i.test(emailLower.split('@')[0])) {
+  // 6. Excessive Repeating Subdomains or Suspicious Structural Patterns
+  if ((domain.match(/\./g) || []).length > 3 || /ltd|survey|click|track|support/i.test(username)) {
     flags.push('SUSPICIOUS_SENDER_STRUCTURE');
     score += 20;
   }
 
-  // 6. Suspicious TLD / Random Domain Extension Detection
+  // 7. Suspicious TLD / Random Domain Extension Detection
   if (
     domain.endsWith('.work') || 
     domain.endsWith('.xyz') || 
@@ -109,8 +119,7 @@ function analyzeSender(senderName = '', senderEmail = '', subject = '') {
     score += 25;
   }
 
-  // 7. Gibberish / High-Entropy Email Usernames
-  const username = emailLower.split('@')[0] || '';
+  // 8. Gibberish / High-Entropy Email Usernames
   if (username.length > 12 && !/[aeiou]/.test(username.slice(0, 8))) {
     flags.push('SUSPICIOUS_SENDER_ADDRESS');
     score += 20;
@@ -119,27 +128,39 @@ function analyzeSender(senderName = '', senderEmail = '', subject = '') {
   return { score, flags };
 }
 
-function analyzeText(text) {
+function analyzeText(text = '', subject = '') {
   const flags = [];
   let score = 0;
-  if (!text) return { score, flags };
+  const combinedText = `${subject} ${text}`.toLowerCase();
 
-  const lower = text.toLowerCase();
+  if (!combinedText.trim()) return { score, flags };
 
-  // Social Engineering & Urgency
+  // 1. Social Engineering & Urgency
   if (
-    lower.includes('action needed') || 
-    lower.includes('reactivate now') || 
-    lower.includes('payment failed') || 
-    lower.includes('subscription is currently inactive')
+    combinedText.includes('action needed') || 
+    combinedText.includes('reactivate now') || 
+    combinedText.includes('payment failed') || 
+    combinedText.includes('subscription is currently inactive')
   ) {
     flags.push('SOCIAL_ENGINEERING_PHRASE');
     score += 30;
   }
 
-  if (lower.includes('update your payment') || lower.includes('restore full access')) {
+  if (combinedText.includes('update your payment') || combinedText.includes('restore full access')) {
     flags.push('PHISHING_KEYWORDS_FOUND');
     score += 25;
+  }
+
+  // 2. Spam / Adult / Clickbait Patterns
+  if (
+    combinedText.includes('(nsfw)') || 
+    combinedText.includes('trick for free') || 
+    combinedText.includes('big pharma') || 
+    combinedText.includes('impotence') ||
+    combinedText.includes('changing male sexual health')
+  ) {
+    flags.push('SPAM_CLICKBAIT_PATTERNS');
+    score += 35;
   }
 
   return { score, flags };
@@ -157,7 +178,7 @@ app.post('/api/analyze', analyzeLimiter, async (req, res) => {
 
     // Run Heuristics
     const senderAnalysis = analyzeSender(senderName, senderEmail, subject);
-    const textAnalysis = analyzeText(text);
+    const textAnalysis = analyzeText(text, subject);
 
     const senderFlags = senderAnalysis.flags;
     const textFlags = textAnalysis.flags;
