@@ -1,4 +1,4 @@
-// server.js - Phish-Shield Express Backend with Full Heuristics & Rate Limiting
+// server.js - Rover Watch Express Backend with Full Heuristics & Rate Limiting
 const express = require('express');
 const cors = require('cors');
 const { rateLimit } = require('express-rate-limit');
@@ -39,7 +39,7 @@ const analyzeLimiter = rateLimit({
 });
 
 app.get('/', (req, res) => {
-  res.status(200).send('Phish-Shield Backend is live 🚀');
+  res.status(200).send('Rover Watch Backend is live 🚀');
 });
 
 // Brand Impersonation & Display Name Heuristics
@@ -233,7 +233,7 @@ app.post('/api/analyze', analyzeLimiter, async (req, res) => {
   try {
     const { urls = [], text = '', senderName = '', senderEmail = '', subject = '' } = req.body || {};
 
-    console.log('=== [Phish-Shield Backend] Analyzing Request ===');
+    console.log('=== [Rover Watch Backend] Analyzing Request ===');
     console.log('Sender:', senderName, `<${senderEmail}>`);
     console.log('Subject:', subject);
     console.log('URLs Count:', urls.length);
