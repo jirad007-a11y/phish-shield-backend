@@ -78,7 +78,7 @@ function analyzeSender(senderName = '', senderEmail = '', subject = '') {
     }
   });
 
-  // 3. Display Name vs Email Username Disconnect (e.g. Name: "Susan" vs "yanakolobneva81@gmail.com")
+  // 3. Display Name vs Email Username Disconnect
   if (rawName && username && rawName.length >= 3 && !username.includes(rawName)) {
     if (/^[a-z]+$/i.test(rawName) && rawName.length <= 8) {
       flags.push('SENDER_NAME_MISMATCH');
@@ -193,6 +193,38 @@ function analyzeText(text = '', subject = '') {
     score += 25;
   }
 
+  // 5. Suspicious Call-to-Action Subjects
+  if (
+    subjectLower === 'click this' || 
+    subjectLower === 'click here' || 
+    subjectLower.includes('verify now') || 
+    subjectLower.includes('urgent action')
+  ) {
+    flags.push('SUSPICIOUS_CALL_TO_ACTION_SUBJECT');
+    score += 30;
+  }
+
+  return { score, flags };
+}
+
+function analyzeBrandMismatch(senderEmail = '', text = '', urls = []) {
+  const flags = [];
+  let score = 0;
+  const emailLower = senderEmail.toLowerCase();
+  const domain = emailLower.split('@')[1] || '';
+  const combinedContent = `${text} ${urls.join(' ')}`.toLowerCase();
+
+  KNOWN_BRANDS.forEach(brand => {
+    if (combinedContent.includes(brand)) {
+      if (!domain.endsWith(`${brand}.com`) && !domain.endsWith(`${brand}plus.com`) && !domain.endsWith(`${brand}life.com`)) {
+        if (['paypal', 'apple', 'netflix', 'microsoft', 'google', 'fidelity'].includes(brand)) {
+          flags.push('UNVERIFIED_BRAND_LINK');
+          score += 40;
+        }
+      }
+    }
+  });
+
   return { score, flags };
 }
 
@@ -209,11 +241,12 @@ app.post('/api/analyze', analyzeLimiter, async (req, res) => {
     // Run Heuristics
     const senderAnalysis = analyzeSender(senderName, senderEmail, subject);
     const textAnalysis = analyzeText(text, subject);
+    const brandMismatchAnalysis = analyzeBrandMismatch(senderEmail, text, urls);
 
-    const senderFlags = senderAnalysis.flags;
+    const senderFlags = [...senderAnalysis.flags, ...brandMismatchAnalysis.flags];
     const textFlags = textAnalysis.flags;
     
-    let totalScore = senderAnalysis.score + textAnalysis.score;
+    let totalScore = senderAnalysis.score + textAnalysis.score + brandMismatchAnalysis.score;
 
     // Additional URL scoring
     if (urls.length > 0) {
