@@ -43,35 +43,73 @@ app.get('/', (req, res) => {
 });
 
 // Brand Impersonation & Display Name Heuristics
-const KNOWN_BRANDS = ['paramount', 'paramountplus', 'netflix', 'paypal', 'apple', 'amazon', 'microsoft', 'google'];
+const KNOWN_BRANDS = [
+  'paramount', 'paramountplus', 'netflix', 'paypal', 
+  'apple', 'amazon', 'microsoft', 'google', 'fidelity', 'fidelitylife'
+];
 
-function analyzeSender(senderName, senderEmail) {
+function analyzeSender(senderName = '', senderEmail = '', subject = '') {
   const flags = [];
   let score = 0;
 
   if (!senderEmail) return { score, flags };
 
-  const nameLower = (senderName || '').toLowerCase();
+  const rawName = (senderName || '').toLowerCase();
   const emailLower = senderEmail.toLowerCase();
   const domain = emailLower.split('@')[1] || '';
 
-  // 1. Display Name / Brand Impersonation Check
+  // 1. Normalize Display Name: Remove spaces, periods, underscores, and dashes
+  // Catches obfuscated trickery like "FID.ELI.TY__L.I.FE" -> "fidelitylife"
+  const normalizedName = rawName.replace(/[^a-z0-9]/g, '');
+
+  // 2. Display Name / Brand Impersonation Check
   KNOWN_BRANDS.forEach(brand => {
-    if (nameLower.includes(brand) || emailLower.includes(brand)) {
-      if (!domain.endsWith(`${brand}.com`) && !domain.endsWith(`${brand}plus.com`)) {
+    if (normalizedName.includes(brand) || emailLower.includes(brand)) {
+      if (
+        !domain.endsWith(`${brand}.com`) && 
+        !domain.endsWith(`${brand}plus.com`) && 
+        !domain.endsWith(`${brand}life.com`)
+      ) {
         flags.push('SENDER_IMPERSONATION');
         score += 50; // Severe penalty for mimicking brands on random domains
       }
     }
   });
 
-  // 2. Suspicious TLD / Random String Domain Detection
-  if (domain.endsWith('.work') || domain.endsWith('.xyz') || domain.endsWith('.top') || domain.endsWith('.click')) {
+  // 3. Obfuscation & Character Manipulation Check in Display Name
+  if (/[a-z]\.[a-z]\.[a-z]/i.test(rawName) || /_[a-z]_[a-z]/i.test(rawName)) {
+    flags.push('NAME_OBFUSCATION_ATTEMPT');
+    score += 25;
+  }
+
+  // 4. IP Address Detection in Subject or Sender Address
+  if (
+    /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/.test(subject) || 
+    /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/.test(senderEmail)
+  ) {
+    flags.push('IP_ADDRESS_IN_HEADER');
+    score += 20;
+  }
+
+  // 5. Excessive Repeating Subdomains or Suspicious Structural Patterns
+  if ((domain.match(/\./g) || []).length > 3 || /ltd|survey|click|track/i.test(emailLower.split('@')[0])) {
+    flags.push('SUSPICIOUS_SENDER_STRUCTURE');
+    score += 20;
+  }
+
+  // 6. Suspicious TLD / Random Domain Extension Detection
+  if (
+    domain.endsWith('.work') || 
+    domain.endsWith('.xyz') || 
+    domain.endsWith('.top') || 
+    domain.endsWith('.click') || 
+    domain.endsWith('.gmx.net')
+  ) {
     flags.push('SUSPICIOUS_TLD');
     score += 25;
   }
 
-  // 3. Gibberish / High-Entropy Email Usernames
+  // 7. Gibberish / High-Entropy Email Usernames
   const username = emailLower.split('@')[0] || '';
   if (username.length > 12 && !/[aeiou]/.test(username.slice(0, 8))) {
     flags.push('SUSPICIOUS_SENDER_ADDRESS');
@@ -89,7 +127,12 @@ function analyzeText(text) {
   const lower = text.toLowerCase();
 
   // Social Engineering & Urgency
-  if (lower.includes('action needed') || lower.includes('reactivate now') || lower.includes('payment failed') || lower.includes('subscription is currently inactive')) {
+  if (
+    lower.includes('action needed') || 
+    lower.includes('reactivate now') || 
+    lower.includes('payment failed') || 
+    lower.includes('subscription is currently inactive')
+  ) {
     flags.push('SOCIAL_ENGINEERING_PHRASE');
     score += 30;
   }
@@ -105,14 +148,15 @@ function analyzeText(text) {
 // Apply the strict analyzeLimiter middleware directly to the POST route
 app.post('/api/analyze', analyzeLimiter, async (req, res) => {
   try {
-    const { urls = [], text = '', senderName = '', senderEmail = '' } = req.body || {};
+    const { urls = [], text = '', senderName = '', senderEmail = '', subject = '' } = req.body || {};
 
     console.log('=== [Phish-Shield Backend] Analyzing Request ===');
     console.log('Sender:', senderName, `<${senderEmail}>`);
+    console.log('Subject:', subject);
     console.log('URLs Count:', urls.length);
 
     // Run Heuristics
-    const senderAnalysis = analyzeSender(senderName, senderEmail);
+    const senderAnalysis = analyzeSender(senderName, senderEmail, subject);
     const textAnalysis = analyzeText(text);
 
     const senderFlags = senderAnalysis.flags;
