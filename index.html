@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PSafe Email - Privacy Policy</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      color: #222;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 0 20px;
+      background-color: #f9f9f9;
+    }
+    .container {
+      background: #ffffff;
+      padding: 40px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+    h1 { color: #1a252c; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
+    h2 { color: #2d3748; margin-top: 28px; }
+    ul { padding-left: 20px; }
+    li { margin-bottom: 8px; }
+    .meta-date { font-weight: bold; color: #718096; margin-bottom: 24px; }
+    footer { margin-top: 40px; font-size: 0.9em; color: #a0aec0; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Privacy Policy for PSafe Email</h1>
+    <p class="meta-date">Effective Date: October 13, 2026 | Last Updated: October 13, 2026</p>
+
+    <p><strong>PSafe Email</strong> ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how our Chrome Extension operates, what data is processed, and our strict commitment to data minimization and user privacy.</p>
+
+    <h2>1. Information We Collect and Process</h2>
+    <p>To provide real-time heuristic analysis and phishing detection, <strong>PSafe Email</strong> processes specific data from your Gmail session:</p>
+    <ul>
+      <li><strong>Email Links (URLs):</strong> The extension extracts hyperlinked URLs contained within the body of emails open in your active Gmail tab.</li>
+      <li><strong>Sender Metadata:</strong> Header details such as the <code>From</code> email address and display name are inspected to detect domain spoofing and sender impersonation.</li>
+    </ul>
+
+    <h3>Data We DO NOT Collect</h3>
+    <ul>
+      <li>We <strong>do not</strong> collect or read the full body text, private personal messages, attachments, or passwords.</li>
+      <li>We <strong>do not</strong> collect personal identification information (e.g., your real name, address, phone number).</li>
+      <li>We <strong>do not</strong> track your browsing history outside of active Gmail tabs where phishing verification occurs.</li>
+    </ul>
+
+    <h2>2. How We Use Information</h2>
+    <p>The data scraped locally by the extension is transmitted securely via HTTPS to our remote analysis engine (<code>https://phish-shield-backend.onrender.com</code>) solely for the following purposes:</p>
+    <ul>
+      <li><strong>Phishing Detection:</strong> Analyzing links against heuristic rules (e.g., suspicious top-level domains, IP-based URLs, keyword manipulation).</li>
+      <li><strong>Spoofing Prevention:</strong> Verifying sender authentication consistency to protect you from spoofed addresses.</li>
+      <li><strong>Real-Time Alerts:</strong> Returning verification status ("Paws Approved" or warning flags) back to your browser interface.</li>
+    </ul>
+
+    <h2>3. Data Storage and Retention</h2>
+    <ul>
+      <li><strong>No Persistent Storage:</strong> <strong>PSafe Email</strong> operates on an ephemeral analysis model. Extracted URLs and header metadata are processed in-memory during the heuristic scan and are <strong>not saved or stored permanently</strong> on our servers.</li>
+      <li><strong>No User Profiles:</strong> We do not build user profiles, track user behavior over time, or store logs tied to individual identities.</li>
+    </ul>
+
+    <h2>4. Data Sharing and Third Parties</h2>
+    <ul>
+      <li><strong>No Data Selling:</strong> We do <strong>not</strong> sell, rent, trade, or monetize your data under any circumstances.</li>
+      <li><strong>No Advertising:</strong> Your data is never used for advertising, remarketing, or targeted marketing purposes.</li>
+      <li><strong>Third-Party Services:</strong> Our backend is hosted on <a href="https://render.com" target="_blank" rel="noopener">Render</a>. Server request logs maintained by infrastructure providers are governed by their respective privacy standards and are used strictly for service availability and security operational monitoring.</li>
+    </ul>
+
+    <h2>5. Security Measures</h2>
+    <p>We implement industry-standard security practices to protect data during transmission:</p>
+    <ul>
+      <li>All communications between the browser extension and our analysis server use secure HTTPS encryption (TLS/SSL).</li>
+      <li>Requests are handled statelessly to minimize exposure.</li>
+    </ul>
+
+    <h2>6. Permissions Justification</h2>
+    <p>To function correctly, <strong>PSafe Email</strong> requests the following Chrome permissions:</p>
+    <ul>
+      <li><code>activeTab</code>: Allows the extension to interact with the currently active Gmail tab to scan email content when commanded.</li>
+      <li><code>host_permissions</code> (<code>https://mail.google.com/*</code>): Required to inspect DOM elements specifically within Gmail to extract suspicious links.</li>
+      <li><code>host_permissions</code> (<code>https://phish-shield-backend.onrender.com/*</code>): Required to send extracted links to our dedicated analysis engine for threat evaluation.</li>
+    </ul>
+
+    <h2>7. Compliance with Web Store Policies</h2>
+    <p><strong>PSafe Email</strong> complies strictly with the <a href="https://developer.chrome.com/docs/webstore/program-policies/user-data-faq/" target="_blank" rel="noopener">Google Chrome Web Store User Data Policy</a>, including the <strong>Single-Purpose Requirement</strong> and <strong>Limited Use</strong> restrictions.</p>
+
+    <h2>8. Changes to This Privacy Policy</h2>
+    <p>We may update this Privacy Policy periodically to reflect improvements to our extension or legal requirements. Any updates will be posted with a revised "Last Updated" date at the top of this document.</p>
+
+    <h2>9. Contact Us</h2>
+    <p>If you have any questions or concerns regarding this Privacy Policy or our data practices, please contact us at:</p>
+    <ul>
+      <li><strong>Project:</strong> PSafe Email</li>
+      <li><strong>Support Email:</strong> support@psafe-email.com</li>
+    </ul>
+  </div>
+
+  <footer>
+    &copy; 2026 PSafe Email. All rights reserved.
+  </footer>
+</body>
+</html>
