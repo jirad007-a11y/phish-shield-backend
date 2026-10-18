@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy - Rover Watch</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1, h2, h3 { color: #1a202c; }
+        h1 { border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
+        code { background: #edf2f7; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+        ul { padding-left: 20px; }
+        .meta { color: #718096; font-size: 0.9em; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+
+    <h1>Privacy Policy for Rover Watch</h1>
+    <p class="meta"><strong>Effective Date:</strong> October 13, 2026 | <strong>Last Updated:</strong> October 18, 2026</p>
+
+    <p><strong>Rover Watch</strong> ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how our web extension operates, what data is processed, and our strict commitment to data minimization and user privacy.</p>
+
+    <h2>1. Information We Collect and Process</h2>
+    <p>To provide real-time heuristic analysis, conversational bait detection, and phishing protection, <strong>Rover Watch</strong> processes specific data from your active Gmail session:</p>
+    <ul>
+        <li><strong>Email Links (URLs):</strong> The extension extracts hyperlinked URLs contained within the body of emails open in your active Gmail tab.</li>
+        <li><strong>Sender Metadata:</strong> Header details such as the "From" email address, display name, and domain information are inspected to detect domain spoofing and sender impersonation.</li>
+        <li><strong>Email Subject & Content Context:</strong> Text content is evaluated locally and statelessly to identify high-risk conversational scams and phishing indicators.</li>
+    </ul>
+
+    <h3>Data We DO NOT Collect</h3>
+    <ul>
+        <li>We do not collect personal identification information (e.g., your real name, home address, phone number).</li>
+        <li>We do not track or record your general web browsing history outside of active Gmail tabs where safety verification occurs.</li>
+        <li>We do not collect or store email attachments, account passwords, or non-email web activity.</li>
+    </ul>
+
+    <h2>2. How We Use Information</h2>
+    <p>The data extracted locally by the extension is transmitted securely via HTTPS to our remote analysis engine (<code>https://phish-shield-backend.onrender.com</code>) solely for the following security purposes:</p>
+    <ul>
+        <li><strong>Phishing Detection:</strong> Analyzing links against heuristic rules (e.g., suspicious top-level domains, IP-based URLs, keyword manipulation).</li>
+        <li><strong>Spoofing Prevention:</strong> Verifying sender authentication consistency to protect you from spoofed addresses.</li>
+        <li><strong>Real-Time Alerts:</strong> Returning verification status and color-coded risk flags directly back to your browser interface.</li>
+    </ul>
+
+    <h2>3. Data Storage and Retention</h2>
+    <ul>
+        <li><strong>No Persistent Storage:</strong> <strong>Rover Watch</strong> operates on an ephemeral analysis model. Extracted URLs, message context, and header metadata are processed in-memory during the heuristic scan and are <strong>never saved or stored permanently</strong> on our servers.</li>
+        <li><strong>No User Profiles:</strong> We do not build user profiles, track user behavior over time, or retain activity logs tied to individual user identities.</li>
+    </ul>
+
+    <h2>4. Data Sharing and Third Parties</h2>
+    <ul>
+        <li><strong>No Data Selling:</strong> We do not sell, rent, trade, or monetize your data under any circumstances.</li>
+        <li><strong>No Advertising:</strong> Your data is never used for advertising, remarketing, or targeted marketing purposes.</li>
+        <li><strong>Third-Party Infrastructure:</strong> Our backend server is hosted on Render. System request logs maintained by infrastructure providers are governed by their respective privacy standards and are used strictly for operational security and service availability monitoring.</li>
+    </ul>
+
+    <h2>5. Security Measures</h2>
+    <p>We implement industry-standard security practices to protect data during transmission:</p>
+    <ul>
+        <li>All communications between the browser extension and our analysis server use secure HTTPS encryption (TLS/SSL).</li>
+        <li>Requests are handled statelessly to minimize exposure and prevent data leakage.</li>
+    </ul>
+
+    <h2>6. Permissions Justification</h2>
+    <p>To function correctly, <strong>Rover Watch</strong> requests the following extension permissions:</p>
+    <ul>
+        <li><code>activeTab</code> & <code>scripting</code>: Allows the extension to interact with the active Gmail tab to scan email content when commanded or loaded.</li>
+        <li><code>host_permissions</code> (<code>https://mail.google.com/*</code>): Required to inspect DOM elements specifically within Gmail to identify suspicious links and display safety warnings.</li>
+        <li><code>host_permissions</code> (<code>https://phish-shield-backend.onrender.com/*</code>): Required to send extracted indicators securely to our dedicated analysis engine for threat evaluation.</li>
+        <li><code>storage</code>: Used locally on your device to retain user extension preferences.</li>
+    </ul>
+
+    <h2>7. Compliance with Developer Policies</h2>
+    <p><strong>Rover Watch</strong> complies strictly with the Google Chrome Web Store User Data Policy and the Mozilla Add-on Developer Data Collection Guidelines, including Single-Purpose Requirements, Limited Use restrictions, and data transparency disclosures.</p>
+
+    <h2>8. Changes to This Privacy Policy</h2>
+    <p>We may update this Privacy Policy periodically to reflect improvements to our extension or legal requirements. Any updates will be posted with a revised "Last Updated" date at the top of this document.</p>
+
+    <h2>9. Contact Us</h2>
+    <p>If you have any questions or concerns regarding this Privacy Policy or our data handling practices, please contact us at:</p>
+    <ul>
+        <li><strong>Project:</strong> Rover Watch</li>
+        <li><strong>Support Email:</strong> <a href="mailto:roverwatch51@gmail.com">roverwatch51@gmail.com</a></li>
+    </ul>
+
+</body>
+</html>
