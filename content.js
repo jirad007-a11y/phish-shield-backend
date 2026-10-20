@@ -1,10 +1,14 @@
-// content.js - Resilient Gmail Scraper & Banner Injector
+// content.js - Resilient Webmail Scraper & Banner Injector (Gmail & Yahoo Mail)
 const DEBOUNCE_DELAY_MS = 600;
 let debounceTimer = null;
 let lastAnalyzedHash = '';
 const dismissedEmails = new Set();
 
-console.log('[Phish-Shield] Content script loaded and active on page.');
+console.log('[Rover Watch] Content script loaded and active on page.');
+
+// Identify provider
+const isGmail = window.location.hostname.includes('mail.google.com');
+const isYahoo = window.location.hostname.includes('mail.yahoo.com');
 
 function getCleanUrl(rawHref) {
   if (!rawHref) return '';
@@ -36,10 +40,14 @@ function translateFlag(flag) {
   return flag.replace(/_/g, ' ').toLowerCase();
 }
 
-function extractEmailData() {
+// -------------------------------------------------------------
+// Provider Specific Data Extraction
+// -------------------------------------------------------------
+
+function extractGmailData() {
   const emailContainers = document.querySelectorAll('.a3s, .ii.gt');
   if (!emailContainers.length) {
-    return { urls: [], textBody: '', senderName: '', senderEmail: '', subject: '' };
+    return { urls: [], textBody: '', senderName: '', senderEmail: '', subject: '', containers: [] };
   }
 
   const subjectElement = document.querySelector('h2.hP, .hP');
@@ -78,18 +86,72 @@ function extractEmailData() {
     textBody: fullText.trim(),
     senderName: senderName.trim(),
     senderEmail: senderEmail.trim(),
-    subject: subjectText
+    subject: subjectText,
+    containers: emailContainers
   };
 }
 
+function extractYahooData() {
+  const emailContainers = document.querySelectorAll('div[data-test-id="message-view-body"], .msg-body');
+  if (!emailContainers.length) {
+    return { urls: [], textBody: '', senderName: '', senderEmail: '', subject: '', containers: [] };
+  }
+
+  const subjectElem = document.querySelector('span[data-test-id="message-group-subject"], h1[data-test-id="message-view-subject"]');
+  const subjectText = subjectElem ? subjectElem.innerText.trim() : '';
+
+  let senderName = '';
+  let senderEmail = '';
+
+  const senderElem = document.querySelector('span[data-test-id="message-header-sender"], .message-header-sender');
+  if (senderElem) {
+    senderName = senderElem.innerText.trim();
+    const match = senderElem.innerText.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+    if (match) senderEmail = match[0];
+  }
+
+  const urlsSet = new Set();
+  let fullText = subjectText ? `Subject: ${subjectText}\n` : '';
+
+  emailContainers.forEach(container => {
+    fullText += container.innerText + '\n';
+    const anchorElements = container.querySelectorAll('a[href]');
+    anchorElements.forEach(anchor => {
+      const cleanHref = getCleanUrl(anchor.getAttribute('href'));
+      if (cleanHref.startsWith('http://') || cleanHref.startsWith('https://')) {
+        urlsSet.add(cleanHref);
+      }
+    });
+  });
+
+  return {
+    urls: Array.from(urlsSet),
+    textBody: fullText.trim(),
+    senderName: senderName.trim(),
+    senderEmail: senderEmail.trim(),
+    subject: subjectText,
+    containers: emailContainers
+  };
+}
+
+function extractEmailData() {
+  if (isGmail) return extractGmailData();
+  if (isYahoo) return extractYahooData();
+  return { urls: [], textBody: '', senderName: '', senderEmail: '', subject: '', containers: [] };
+}
+
+// -------------------------------------------------------------
+// UI Banner Injection
+// -------------------------------------------------------------
+
 function injectEmailStatusBanner(container, emailSummary, results, senderEmail) {
-  const existingBanner = container.querySelector('.phish-shield-banner');
+  const existingBanner = container.querySelector('.rover-watch-banner');
   if (existingBanner) existingBanner.remove();
 
   if (dismissedEmails.has(senderEmail)) return;
 
   const score = (emailSummary && typeof emailSummary.riskScore === 'number') ? emailSummary.riskScore : 0;
-  console.log('[Phish-Shield GUI Debug] Extracted riskScore for banner:', score, 'from object:', emailSummary);
+  console.log('[Rover Watch GUI Debug] Extracted riskScore for banner:', score);
 
   const verdict = emailSummary.overallVerdict || 'SAFE';
   const isHighRisk = verdict === 'HIGH_RISK';
@@ -97,7 +159,7 @@ function injectEmailStatusBanner(container, emailSummary, results, senderEmail) 
   const isSafe = verdict === 'SAFE';
 
   const banner = document.createElement('div');
-  banner.className = 'phish-shield-banner';
+  banner.className = 'rover-watch-banner';
 
   const allFlags = [
     ...(emailSummary.senderFlags || []),
@@ -131,7 +193,7 @@ function injectEmailStatusBanner(container, emailSummary, results, senderEmail) 
             ${description}
           </p>
           ${!isSafe ? `
-            <button class="phish-shield-dismiss-btn" style="background: none; border: none; padding: 0; color: inherit; text-decoration: underline; cursor: pointer; font-size: 11px; font-weight: bold; opacity: 0.8;">
+            <button class="rover-watch-dismiss-btn" style="background: none; border: none; padding: 0; color: inherit; text-decoration: underline; cursor: pointer; font-size: 11px; font-weight: bold; opacity: 0.8;">
               Trust sender / Dismiss warning
             </button>
           ` : ''}
@@ -170,12 +232,12 @@ function injectEmailStatusBanner(container, emailSummary, results, senderEmail) 
   });
 
   if (!isSafe) {
-    const dismissBtn = banner.querySelector('.phish-shield-dismiss-btn');
+    const dismissBtn = banner.querySelector('.rover-watch-dismiss-btn');
     if (dismissBtn) {
       dismissBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         dismissedEmails.add(senderEmail);
-        document.querySelectorAll('.phish-shield-banner').forEach(b => b.remove());
+        document.querySelectorAll('.rover-watch-banner').forEach(b => b.remove());
       });
     }
   }
@@ -183,9 +245,13 @@ function injectEmailStatusBanner(container, emailSummary, results, senderEmail) 
   container.insertBefore(banner, container.firstChild);
 }
 
+// -------------------------------------------------------------
+// Core Scanner Process & Observer
+// -------------------------------------------------------------
+
 function processEmailBody() {
   try {
-    const { urls, textBody, senderName, senderEmail, subject } = extractEmailData();
+    const { urls, textBody, senderName, senderEmail, subject, containers } = extractEmailData();
     if (urls.length === 0 && !textBody && !senderEmail) return;
     if (dismissedEmails.has(senderEmail)) return;
 
@@ -203,15 +269,14 @@ function processEmailBody() {
           const emailSummary = responseData.emailSummary || { overallVerdict: 'SAFE', riskScore: 0 };
           const results = responseData.results || [];
           
-          const emailContainers = document.querySelectorAll('.a3s');
-          emailContainers.forEach(container => {
+          containers.forEach(container => {
             injectEmailStatusBanner(container, emailSummary, results, senderEmail);
           });
         }
       }
     );
   } catch (err) {
-    console.error('[Phish-Shield] Error in scanner process:', err);
+    console.error('[Rover Watch] Error in scanner process:', err);
   }
 }
 
